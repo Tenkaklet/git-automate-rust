@@ -47,9 +47,6 @@ fn update_commit_push() {
         exit(1);
     }
 
-
-    println!("git push command success");
-
 }
 
 fn name_genrator() -> String {
@@ -74,7 +71,6 @@ fn main() {
     let mut downloaded = 0;
     fn print_current_dir() -> std::path::PathBuf {
         let current_dir = std::env::current_dir().unwrap();
-        println!("The current directory is {}", current_dir.display());
         return current_dir;
     }
 
@@ -94,6 +90,7 @@ fn main() {
     }
 
     pb.finish_with_message("downloaded");
+    println!("Git Automation complete, Gracias!");
 
     update_commit_push();
 }
