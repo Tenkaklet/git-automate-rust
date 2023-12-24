@@ -3,6 +3,10 @@ use names::Generator;
 use std::thread;
 use std::time::Duration;
 use std::{cmp::min, fmt::Write};
+use std::fs;
+use std::path::Path;
+use walkdir::WalkDir;
+use std::env;
 
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 
@@ -36,7 +40,7 @@ fn update_commit_push() {
         .output()
         .expect("failed to execute git push command");
 
-    println!("{}", push_command.status.success());
+    
 
     if !push_command.status.success() {
         eprintln!("Command executed with errors:");
@@ -54,10 +58,29 @@ fn name_genrator() -> String {
     generator.next().unwrap()
 }
 
+fn get_dir_size(path: &Path) -> u64 {
+    WalkDir::new(path)
+        .into_iter()
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| fs::metadata(entry.path()).ok())
+        .filter(|metadata| metadata.is_file())
+        .map(|metadata| metadata.len())
+        .sum()
+}
+
+
+
 
 fn main() {
     let mut downloaded = 0;
-    let total_size = 231231231; // total size is the size of the repo
+    fn print_current_dir() {
+        match env::current_dir() {
+            Ok(path) => println!("The current directory is {}", path.display()),
+            Err(e) => println!("Couldn't get the current directory: {}", e),
+        }
+    }
+    print_current_dir();
+    let total_size = 1243525; // total size is the size of the repo
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
         .unwrap()
@@ -71,6 +94,6 @@ fn main() {
     }
 
     pb.finish_with_message("downloaded");
-    
+
     update_commit_push();
 }

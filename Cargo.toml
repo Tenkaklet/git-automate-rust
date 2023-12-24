@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 indicatif = "0.17.7"
 names = "0.14.0"
+walkdir ="2.3.2"
