@@ -35,7 +35,7 @@ fn update_commit_push() {
     let push_command = Command::new("git")
         .arg("push")
         .arg("origin")
-        .arg("main")
+        .arg("master")
         .output()
         .expect("failed to execute git push command");
 
