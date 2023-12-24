@@ -74,13 +74,11 @@ fn get_dir_size(path: &Path) -> u64 {
 fn main() {
     let mut downloaded = 0;
     fn print_current_dir() {
-        match env::current_dir() {
-            Ok(path) => println!("The current directory is {}", path.display()),
-            Err(e) => println!("Couldn't get the current directory: {}", e),
-        }
+        let current_dir = env::current_dir().unwrap();
+        println!("The current directory is {}", current_dir.display());
     }
     print_current_dir();
-    let total_size = 1243525; // total size is the size of the repo
+    let total_size = 4; // total size is the size of the repo
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
         .unwrap()
