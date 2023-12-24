@@ -6,7 +6,6 @@ use std::{cmp::min, fmt::Write};
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
-use std::env;
 
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 
@@ -73,12 +72,15 @@ fn get_dir_size(path: &Path) -> u64 {
 
 fn main() {
     let mut downloaded = 0;
-    fn print_current_dir() {
-        let current_dir = env::current_dir().unwrap();
+    fn print_current_dir() -> std::path::PathBuf {
+        let current_dir = std::env::current_dir().unwrap();
         println!("The current directory is {}", current_dir.display());
+        return current_dir;
     }
+
     print_current_dir();
-    let total_size = 4; // total size is the size of the repo
+    let current_dir = print_current_dir();
+    let total_size =  get_dir_size(&current_dir);// total size is the size of the repo
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
         .unwrap()
