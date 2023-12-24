@@ -32,6 +32,7 @@ fn update_commit_push() {
         .expect("failed to execute git push command");
 
     println!("{}",push_command.status.success());
+    
 
     if !push_command.status.success() {
         println!("git push command failed");
