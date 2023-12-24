@@ -31,11 +31,11 @@ fn update_commit_push() {
         .output()
         .expect("failed to execute git push command");
 
-    println!("{}",push_command.status.success());
-    
+    println!("{}", push_command.status.success());
 
     if !push_command.status.success() {
-        println!("git push command failed");
+        eprintln!("Command executed with errors:");
+        eprintln!("{}", String::from_utf8_lossy(&push_command.stderr));
         exit(1);
     }
 
