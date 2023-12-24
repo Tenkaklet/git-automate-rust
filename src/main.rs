@@ -39,6 +39,7 @@ fn update_commit_push() {
         exit(1);
     }
 
+    
     println!("git push command success");
 
 }
