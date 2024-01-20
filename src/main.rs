@@ -25,6 +25,7 @@ fn update_commit_push() {
         println!("git add command failed");
         exit(1);
     }
+    
 
     let commit_command = Command::new("git")
         .arg("commit")
