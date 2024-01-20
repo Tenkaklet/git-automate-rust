@@ -4,8 +4,15 @@ use std::thread;
 use std::time::Duration;
 use std::{cmp::min, fmt::Write};
 use std::fs;
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
 use walkdir::WalkDir;
+// use openai::{ApiResponseOrError};
+use openai::files::File as OpenAiFile;
+
+
+
 
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 
@@ -64,19 +71,45 @@ fn get_dir_size(path: &Path) -> u64 {
         .sum()
 }
 
+// #[tokio::main]
+// async fn openai_file_reader(file: &str) -> ApiResponseOrError<()> {
+    
+//     set_key(env::var("OPENAI_KEY").unwrap());
+//     let mut file = File::open(file)?;
+//     let mut contents = String::new();
+//     file.read_to_string(&mut contents)?;
+//     OpenAiFile::builder()
+//         .file_name(contents) // local file path to upload.
+//         .purpose("assistants")
+//         .create()
+//         .await?;
+//     Ok(())
+// }
 
+fn print_current_dir() -> std::path::PathBuf {
+    let current_dir = std::env::current_dir().unwrap();
+    return current_dir;
+}
 
-
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut downloaded = 0;
-    fn print_current_dir() -> std::path::PathBuf {
-        let current_dir = std::env::current_dir().unwrap();
-        return current_dir;
-    }
 
-    print_current_dir();
-    let current_dir = print_current_dir();
-    let total_size =  get_dir_size(&current_dir);// total size is the size of the repo
+    // set_key(env::var("OPENAI_API_KEY").unwrap().to_string());
+
+    
+    let current_dir = print_current_dir(); //*** THIS CAN BE USED TO READ THE FILES FOR GOOGLE GEMINI */
+    // let mut file = File::open(&current_dir)?;
+    // let mut contents = String::new();
+    // file.read_to_string(&mut contents)?;
+    // let file_to_check = OpenAiFile::builder()
+    //     .file_name(contents) // local file path to upload.
+    //     .purpose("assistants")
+    //     .create()
+    //     .await?;
+
+    // println!("what is this? {:?}", file_to_check.object);
+    let total_size = get_dir_size(&current_dir); // total size is the size of the repo
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
         .unwrap()
@@ -93,4 +126,6 @@ fn main() {
     println!("Git Automation complete, Gracias!");
 
     update_commit_push();
+    Ok(())
 }
+
