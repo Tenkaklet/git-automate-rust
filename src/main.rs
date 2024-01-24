@@ -1,4 +1,5 @@
-use names::Generator;
+
+use std::cmp::min;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -6,31 +7,180 @@ use std::path::Path;
 use std::process::{exit, Command};
 use std::thread;
 use std::time::Duration;
-use std::{cmp::min};
+use reqwest::header::{HeaderMap, AUTHORIZATION};
 use walkdir::WalkDir;
-// use openai::{ApiResponseOrError};
-use openai::files::File as OpenAiFile;
+use openai::set_key;
 use std::fs::{read_to_string, remove_file};
 use std::io::{self};
+use reqwest;
+use dotenv::dotenv;
+use std::env;
+use reqwest::header::CONTENT_TYPE;
 
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+use serde_json::{self, json};
 
-fn update_commit_push() {
+
+
+
+
+fn read_additions_removals(diff_content: &str) -> (Vec<&str>, Vec<&str>) {
+    let mut additions = Vec::new();
+    let mut removals = Vec::new();
+
+    // Split the diff content into lines
+    let lines: Vec<&str> = diff_content.lines().collect();
+
+    for line in lines {
+        // Check if the line is an addition or removal
+        if line.starts_with('+') {
+            additions.push(&line[1..]); // Remove the '+' prefix
+        } else if line.starts_with('-') {
+            removals.push(&line[1..]); // Remove the '-' prefix
+        }
+    }
+
+    (additions, removals)
+}
+
+async fn name_genrator() -> () {
+    let git_diff_output = Command::new("git").arg("diff").output();
+
+    // Check if the 'git diff' command was successful
+    let output = match git_diff_output {
+        Ok(output) => output,
+        Err(e) => {
+            eprintln!("Error running 'git diff': {}", e);
+            exit(1);
+        }
+    };
+
+    // Check if 'git diff' command produced any output
+    if !output.stdout.is_empty() {
+        // Write the output to a text document
+        let diff_text = String::from_utf8_lossy(&output.stdout);
+        if let Err(e) = write_diff_to_file(&diff_text) {
+            eprintln!("Error writing diff to file: {}", e);
+            exit(1);
+        }
+
+        // Read the content of the text document
+        if let Ok(read_diff) = read_diff_from_file() {
+                generate_commit_message(&read_diff);
+                let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
+
+    let mut headers = HeaderMap::new();
+    headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
+    headers.insert(
+        AUTHORIZATION,
+        format!("Bearer {}", api_key).parse().unwrap(),
+    );
+
+    let client = reqwest::Client::builder()
+        .default_headers(headers)
+        .build()?;
+
+    let body = json!({
+        "model": "gpt-3.5-turbo-instruct",
+        "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a helpful GitHub assistant. Generate a commit message based on the following Git diff"
+                },
+                {
+                    "role": "user",
+                    "content": read_diff.to_string()
+                }
+            ]
+    });
+
+    let res = client
+        .post("https://api.openai.com/v1/chat/completions")
+        .json(&body)
+        .send()
+        .await;
+
+    let text: String = res.json().await?;
+    println!("text: {:?}", text);
+
+    Ok(());
+            
+        } else {
+            eprintln!("Error reading diff from file");
+            exit(1);
+        }
+
+        // Delete the created text document
+        if let Err(e) = delete_diff_file() {
+            eprintln!("Error deleting diff file: {}", e);
+            exit(1);
+        }
+    } else {
+        println!("No changes in 'git diff'.");
+    }
+    
+}
+
+async fn get_commit_message() {
+    // Here you should implement the logic to get the commit message
+    // For now, I'll just return a static string
+    let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
+
+    let mut headers = HeaderMap::new();
+    headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
+    headers.insert(
+        AUTHORIZATION,
+        format!("Bearer {}", api_key).parse().unwrap(),
+    );
+
+    let client = reqwest::Client::builder()
+        .default_headers(headers)
+        .build()?;
+
+    let body = json!({
+        "model": "gpt-3.5-turbo-instruct",
+        "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a helpful GitHub assistant. Generate a commit message based on the following Git diff"
+                },
+                {
+                    "role": "user",
+                    "content": diff_content.to_string()
+                }
+            ]
+    });
+
+    let res = client
+        .post("https://api.openai.com/v1/chat/completions")
+        .json(&body)
+        .send()
+        .await?;
+
+    let text: String = res.json().await?;
+    println!("text: {:?}", text);
+    Ok((text))
+}
+
+
+
+async fn update_commit_push() {
     let add_command = Command::new("git")
         .arg("add")
         .arg("-A")
         .output()
         .expect("failed to execute git add command");
+
     if !add_command.status.success() {
         println!("git add command failed");
         exit(1);
     }
-    
 
+    let commit = get_commit_message().await;
     let commit_command = Command::new("git")
         .arg("commit")
         .arg("-m")
-        .arg(name_genrator())
+        .arg(commit) // Convert commit_message to String
         .output()
         .expect("failed to execute git commit command");
 
@@ -50,13 +200,13 @@ fn update_commit_push() {
         eprintln!("Command executed with errors:");
         eprintln!("{}", String::from_utf8_lossy(&push_command.stderr));
         exit(1);
-    }
+    };
 }
 
-fn name_genrator() -> String {
-    let mut generator = Generator::default();
-    generator.next().unwrap()
-}
+
+
+
+
 
 fn get_dir_size(path: &Path) -> u64 {
     WalkDir::new(path)
@@ -84,20 +234,7 @@ fn delete_diff_file() -> io::Result<()> {
     Ok(())
 }
 
-// #[tokio::main]
-// async fn openai_file_reader(file: &str) -> ApiResponseOrError<()> {
 
-//     set_key(env::var("OPENAI_KEY").unwrap());
-//     let mut file = File::open(file)?;
-//     let mut contents = String::new();
-//     file.read_to_string(&mut contents)?;
-//     OpenAiFile::builder()
-//         .file_name(contents) // local file path to upload.
-//         .purpose("assistants")
-//         .create()
-//         .await?;
-//     Ok(())
-// }
 
 // ** this reads the git diff
 
@@ -137,35 +274,75 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             exit(1);
         }
 
-        // Delete the created text document
-        if let Err(e) = delete_diff_file() {
-            eprintln!("Error deleting diff file: {}", e);
-            exit(1);
-        }
+        // // Delete the created text document
+        // if let Err(e) = delete_diff_file() {
+        //     eprintln!("Error deleting diff file: {}", e);
+        //     exit(1);
+        // }
     } else {
         println!("No changes in 'git diff'.");
     }
+
     let mut downloaded = 0;
+    let total_size = get_dir_size(&print_current_dir());
+    let mut file = fs::File::open("git_diff.txt").expect("Unable to open file");
+    let mut diff_content = String::new();
+    dotenv().unwrap();
+    set_key(env::var("OPENAI_KEY").unwrap());
 
-    // set_key(env::var("OPENAI_API_KEY").unwrap().to_string());
+    //let current_dir = print_current_dir(); //*** THIS CAN BE USED TO READ THE FILES FOR GOOGLE GEMINI */
+    
+    file.read_to_string(&mut diff_content)
+        .expect("Unable to read file");
+    // Generate a commit message
+    let commit_message = async {
+        match generate_commit_message(&diff_content).await {
+            Ok(msg) => msg,
+            Err(err) => {
+                eprintln!("Error generating commit message: {}", err);
+                String::new()
+            }
+        }
+    }
+    .await;
 
-    let current_dir = print_current_dir(); //*** THIS CAN BE USED TO READ THE FILES FOR GOOGLE GEMINI */
-                                           // let mut file = File::open(&current_dir)?;
-                                           // let mut contents = String::new();
-                                           // file.read_to_string(&mut contents)?;
-                                           // let file_to_check = OpenAiFile::builder()
-                                           //     .file_name(contents) // local file path to upload.
-                                           //     .purpose("assistants")
-                                           //     .create()
-                                           //     .await?;
-
-    // println!("what is this? {:?}", file_to_check.object);
-    let pb = ProgressBar::new(100);
+    // Print the generated commit message
+    println!("Generated Commit Message:");
+    println!("{}", commit_message);
+    let _file = fs::File::open("git_diff.txt").expect("Unable to open file");
+    let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
         .unwrap()
         .with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap())
         .progress_chars("#>-"));
 
+    while downloaded < total_size {
+        let new = min(downloaded + 223211, total_size);
+        downloaded = new;
+        pb.set_position(new);
+        thread::sleep(Duration::from_millis(12));
+    }
+
+    pb.finish_with_message("downloaded");
+    println!("Git Automation complete, Gracias!");
     update_commit_push();
+    Ok::<(), std::io::Error>(())
+        .expect("Unable to write data");
+
+    let (additions, removals) = read_additions_removals(&diff_content);
+
+    // Print the additions
+    println!("Additions:");
+    for addition in additions {
+        println!("{}", addition);
+    }
+
+    // Print the removals
+    println!("Removals:");
+    for removal in removals {
+        println!("{}", removal);
+    }
     Ok(())
 }
+
+
