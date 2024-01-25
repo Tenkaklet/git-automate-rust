@@ -89,7 +89,7 @@ async fn name_genrator() -> () {
                 },
                 {
                     "role": "user",
-                    "content": read_diff.to_string()
+                    "content": read_diff.to_string() // TODO: Fix this to be as string.
                 }
             ]
     });
