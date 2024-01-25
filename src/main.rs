@@ -1,28 +1,23 @@
-
+use dotenv::dotenv;
+use openai::set_key;
+use reqwest;
+use reqwest::header::CONTENT_TYPE;
+use reqwest::header::{HeaderMap, AUTHORIZATION};
 use std::cmp::min;
+use std::env;
 use std::fs;
 use std::fs::File;
+use std::fs::{read_to_string, remove_file};
+use std::io::{self};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::process::{exit, Command};
 use std::thread;
 use std::time::Duration;
-use reqwest::header::{HeaderMap, AUTHORIZATION};
 use walkdir::WalkDir;
-use openai::set_key;
-use std::fs::{read_to_string, remove_file};
-use std::io::{self};
-use reqwest;
-use dotenv::dotenv;
-use std::env;
-use reqwest::header::CONTENT_TYPE;
 
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use serde_json::{self, json};
-
-
-
-
 
 fn read_additions_removals(diff_content: &str) -> (Vec<&str>, Vec<&str>) {
     let mut additions = Vec::new();
@@ -43,7 +38,7 @@ fn read_additions_removals(diff_content: &str) -> (Vec<&str>, Vec<&str>) {
     (additions, removals)
 }
 
-async fn name_genrator() -> () {
+async fn name_genrator() -> String {
     let git_diff_output = Command::new("git").arg("diff").output();
 
     // Check if the 'git diff' command was successful
@@ -66,62 +61,54 @@ async fn name_genrator() -> () {
 
         // Read the content of the text document
         if let Ok(read_diff) = read_diff_from_file() {
-                generate_commit_message(&read_diff);
-                let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
+            // Here you should implement the logic to get the commit message
+            // For now, I'll just return a static string
+            let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
 
-    let mut headers = HeaderMap::new();
-    headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
-    headers.insert(
-        AUTHORIZATION,
-        format!("Bearer {}", api_key).parse().unwrap(),
-    );
+            let mut headers = HeaderMap::new();
+            headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
+            headers.insert(
+                AUTHORIZATION,
+                format!("Bearer {}", api_key).parse().unwrap(),
+            );
 
-    let client = reqwest::Client::builder()
-        .default_headers(headers)
-        .build()?;
+            let client = reqwest::Client::builder().default_headers(headers).build();
 
-    let body = json!({
-        "model": "gpt-3.5-turbo-instruct",
-        "messages": [
-                {
-                    "role": "system",
-                    "content": "You are a helpful GitHub assistant. Generate a commit message based on the following Git diff"
-                },
-                {
-                    "role": "user",
-                    "content": read_diff.to_string() // TODO: Fix this to be as string.
-                }
-            ]
-    });
+            let body = json!({
+                "model": "gpt-3.5-turbo-instruct",
+                "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are a helpful GitHub assistant. Generate a commit message based on the following Git diff"
+                        },
+                        {
+                            "role": "user",
+                            "content": read_diff.to_string()
+                        }
+                    ]
+            });
 
-    let res = client
-        .post("https://api.openai.com/v1/chat/completions")
-        .json(&body)
-        .send()
-        .await;
+            let res = client
+                .post("https://api.openai.com/v1/chat/completions")
+                .json(&body)
+                .send()
+                .await;
 
-    let text: String = res.json().await;
-    println!("text: {:?}", text);
-
-    Ok(());
-            
+            let text: String = res.json().await.unwrap().choices[0].text.clone();
+            println!("text: {:?}", text);
+            text
         } else {
             eprintln!("Error reading diff from file");
             exit(1);
         }
-
-        // Delete the created text document
-        if let Err(e) = delete_diff_file() {
-            eprintln!("Error deleting diff file: {}", e);
-            exit(1);
-        }
     } else {
-        println!("No changes in 'git diff'.");
+        // Return empty string if no diff
+        String::new()
     }
-    
 }
 
-async fn get_commit_message(diff_content: &str) -> Result<String, Box<dyn std::error::Error>>{
+
+async fn get_commit_message(diff_content: &str) -> String {
     // Here you should implement the logic to get the commit message
     // For now, I'll just return a static string
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
@@ -135,7 +122,8 @@ async fn get_commit_message(diff_content: &str) -> Result<String, Box<dyn std::e
 
     let client = reqwest::Client::builder()
         .default_headers(headers)
-        .build()?;
+        .build()
+        .expect("failed to build client");
 
     let body = json!({
         "model": "gpt-3.5-turbo-instruct",
@@ -157,11 +145,10 @@ async fn get_commit_message(diff_content: &str) -> Result<String, Box<dyn std::e
         .send()
         .await?;
 
-    let text: String = res.json().await?;
+    let text: String = res.json().await.unwrap().choices[0].text.clone();
     println!("text: {:?}", text);
-    Ok(text)
+    text
 }
-
 
 
 async fn update_commit_push() {
@@ -203,11 +190,6 @@ async fn update_commit_push() {
     };
 }
 
-
-
-
-
-
 fn get_dir_size(path: &Path) -> u64 {
     WalkDir::new(path)
         .into_iter()
@@ -233,8 +215,6 @@ fn delete_diff_file() -> io::Result<()> {
     remove_file("git_diff.txt")?;
     Ok(())
 }
-
-
 
 // ** this reads the git diff
 
@@ -273,8 +253,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("Error reading diff from file");
             exit(1);
         }
-
-        
     } else {
         println!("No changes in 'git diff'.");
     }
@@ -287,7 +265,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     set_key(env::var("OPENAI_KEY").unwrap());
 
     //let current_dir = print_current_dir(); //*** THIS CAN BE USED TO READ THE FILES FOR GOOGLE GEMINI */
-    
     let _file = fs::File::open("git_diff.txt").expect("Unable to open file");
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
@@ -305,8 +282,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     pb.finish_with_message("downloaded");
     println!("Git Automation complete, Gracias!");
     update_commit_push();
-    Ok::<(), std::io::Error>(())
-        .expect("Unable to write data");
+    Ok::<(), std::io::Error>(()).expect("Unable to write data");
 
     let (additions, removals) = read_additions_removals(&diff_content);
 
@@ -323,5 +299,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     Ok(())
 }
-
-
