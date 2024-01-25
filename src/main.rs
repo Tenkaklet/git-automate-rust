@@ -1,15 +1,15 @@
 use dotenv::dotenv;
 use openai::set_key;
-use reqwest::{self, Error};
 use reqwest::header::CONTENT_TYPE;
 use reqwest::header::{HeaderMap, AUTHORIZATION};
+use reqwest::{self, Error};
 use std::cmp::min;
 use std::env;
 use std::fs;
 use std::fs::File;
 use std::fs::{read_to_string, remove_file};
-use std::io::{self};
 use std::io::Write;
+use std::io::{self};
 use std::path::Path;
 use std::process::{exit, Command};
 use std::thread;
@@ -53,7 +53,6 @@ async fn name_generator() -> Result<(), reqwest::Error> {
             format!("Bearer {}", api_key).parse().unwrap(),
         );
 
-        
         let body = json!({
             "model": "gpt-3.5-turbo-instruct",
             "messages": [
@@ -83,8 +82,6 @@ async fn name_generator() -> Result<(), reqwest::Error> {
 
     Ok(())
 }
-
-
 
 async fn get_commit_message(diff_content: &str) -> Result<String, reqwest::Error> {
     // Here you should implement the logic to get the commit message
@@ -130,8 +127,6 @@ async fn get_commit_message(diff_content: &str) -> Result<String, reqwest::Error
     Ok(text.to_string())
 }
 
-
-
 async fn update_commit_push() {
     let add_command = Command::new("git")
         .arg("add")
@@ -148,7 +143,7 @@ async fn update_commit_push() {
     let commit_command = Command::new("git")
         .arg("commit")
         .arg("-m")
-        .arg(commit) // Convert commit_message to String
+        .arg(commit.expect("Commit msg should exist")) // Convert commit_message to String
         .output()
         .expect("failed to execute git commit command");
 
