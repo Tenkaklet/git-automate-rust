@@ -1,6 +1,6 @@
 use dotenv::dotenv;
 use openai::set_key;
-use reqwest;
+use reqwest::{self, Error};
 use reqwest::header::CONTENT_TYPE;
 use reqwest::header::{HeaderMap, AUTHORIZATION};
 use std::cmp::min;
@@ -9,7 +9,7 @@ use std::fs;
 use std::fs::File;
 use std::fs::{read_to_string, remove_file};
 use std::io::{self};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::Path;
 use std::process::{exit, Command};
 use std::thread;
@@ -38,77 +38,55 @@ fn read_additions_removals(diff_content: &str) -> (Vec<&str>, Vec<&str>) {
     (additions, removals)
 }
 
-async fn name_genrator() -> String {
-    let git_diff_output = Command::new("git").arg("diff").output();
+// Assuming the function signature is something like this:
+async fn name_generator() -> Result<(), reqwest::Error> {
+    // Read the content of the text document
+    if let Ok(read_diff) = read_diff_from_file() {
+        // Here you should implement the logic to get the commit message
+        // For now, I'll just return a static string
+        let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
 
-    // Check if the 'git diff' command was successful
-    let output = match git_diff_output {
-        Ok(output) => output,
-        Err(e) => {
-            eprintln!("Error running 'git diff': {}", e);
-            exit(1);
-        }
-    };
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
+        headers.insert(
+            AUTHORIZATION,
+            format!("Bearer {}", api_key).parse().unwrap(),
+        );
 
-    // Check if 'git diff' command produced any output
-    if !output.stdout.is_empty() {
-        // Write the output to a text document
-        let diff_text = String::from_utf8_lossy(&output.stdout);
-        if let Err(e) = write_diff_to_file(&diff_text) {
-            eprintln!("Error writing diff to file: {}", e);
-            exit(1);
-        }
+        
+        let body = json!({
+            "model": "gpt-3.5-turbo-instruct",
+            "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are a helpful GitHub assistant. Generate a commit message based on the following Git diff"
+                    },
+                    {
+                        "role": "user",
+                        "content": read_diff.to_string()
+                    }
+                ]
+        });
 
-        // Read the content of the text document
-        if let Ok(read_diff) = read_diff_from_file() {
-            // Here you should implement the logic to get the commit message
-            // For now, I'll just return a static string
-            let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
+        // Assuming you want to send the request here
+        let client = reqwest::Client::new();
+        let res = client
+            .post("https://api.openai.com/v1/chat/completions")
+            .headers(headers)
+            .json(&body)
+            .send()
+            .await?;
 
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
-            headers.insert(
-                AUTHORIZATION,
-                format!("Bearer {}", api_key).parse().unwrap(),
-            );
-
-            let client = reqwest::Client::builder().default_headers(headers).build();
-
-            let body = json!({
-                "model": "gpt-3.5-turbo-instruct",
-                "messages": [
-                        {
-                            "role": "system",
-                            "content": "You are a helpful GitHub assistant. Generate a commit message based on the following Git diff"
-                        },
-                        {
-                            "role": "user",
-                            "content": read_diff.to_string()
-                        }
-                    ]
-            });
-
-            let res = client
-                .post("https://api.openai.com/v1/chat/completions")
-                .json(&body)
-                .send()
-                .await;
-
-            let text: String = res.json().await.unwrap().choices[0].text.clone();
-            println!("text: {:?}", text);
-            text
-        } else {
-            eprintln!("Error reading diff from file");
-            exit(1);
-        }
-    } else {
-        // Return empty string if no diff
-        String::new()
+        // Handle the response here
+        // For now, just ignore it
     }
+
+    Ok(())
 }
 
 
-async fn get_commit_message(diff_content: &str) -> String {
+
+async fn get_commit_message(diff_content: &str) -> Result<String, reqwest::Error> {
     // Here you should implement the logic to get the commit message
     // For now, I'll just return a static string
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
@@ -145,10 +123,13 @@ async fn get_commit_message(diff_content: &str) -> String {
         .send()
         .await?;
 
-    let text: String = res.json().await.unwrap().choices[0].text.clone();
-    println!("text: {:?}", text);
-    text
+    let json: serde_json::Value = res.json().await?;
+
+    let text = json["choices"][0]["message"]["content"].as_str().unwrap();
+
+    Ok(text.to_string())
 }
+
 
 
 async fn update_commit_push() {
