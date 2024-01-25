@@ -100,7 +100,7 @@ async fn name_genrator() -> () {
         .send()
         .await;
 
-    let text: String = res.json().await?;
+    let text: String = res.json().await;
     println!("text: {:?}", text);
 
     Ok(());
@@ -121,7 +121,7 @@ async fn name_genrator() -> () {
     
 }
 
-async fn get_commit_message() {
+async fn get_commit_message(diff_content: &str) -> Result<String, Box<dyn std::error::Error>>{
     // Here you should implement the logic to get the commit message
     // For now, I'll just return a static string
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
@@ -159,7 +159,7 @@ async fn get_commit_message() {
 
     let text: String = res.json().await?;
     println!("text: {:?}", text);
-    Ok((text))
+    Ok(text)
 }
 
 
@@ -176,7 +176,7 @@ async fn update_commit_push() {
         exit(1);
     }
 
-    let commit = get_commit_message().await;
+    let commit = get_commit_message("diff").await;
     let commit_command = Command::new("git")
         .arg("commit")
         .arg("-m")
@@ -274,11 +274,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             exit(1);
         }
 
-        // // Delete the created text document
-        // if let Err(e) = delete_diff_file() {
-        //     eprintln!("Error deleting diff file: {}", e);
-        //     exit(1);
-        // }
+        
     } else {
         println!("No changes in 'git diff'.");
     }
@@ -292,23 +288,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //let current_dir = print_current_dir(); //*** THIS CAN BE USED TO READ THE FILES FOR GOOGLE GEMINI */
     
-    file.read_to_string(&mut diff_content)
-        .expect("Unable to read file");
-    // Generate a commit message
-    let commit_message = async {
-        match generate_commit_message(&diff_content).await {
-            Ok(msg) => msg,
-            Err(err) => {
-                eprintln!("Error generating commit message: {}", err);
-                String::new()
-            }
-        }
-    }
-    .await;
-
-    // Print the generated commit message
-    println!("Generated Commit Message:");
-    println!("{}", commit_message);
     let _file = fs::File::open("git_diff.txt").expect("Unable to open file");
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
