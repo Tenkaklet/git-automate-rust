@@ -2,12 +2,12 @@ use dotenv::dotenv;
 use openai::set_key;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::header::{HeaderMap, AUTHORIZATION};
-use reqwest::{self, Error};
+use reqwest::{self};
 use std::cmp::min;
 use std::env;
 use std::fs;
 use std::fs::File;
-use std::fs::{read_to_string, remove_file};
+use std::fs::read_to_string;
 use std::io::Write;
 use std::io::{self};
 use std::path::Path;
@@ -39,49 +39,7 @@ fn read_additions_removals(diff_content: &str) -> (Vec<&str>, Vec<&str>) {
 }
 
 // Assuming the function signature is something like this:
-async fn name_generator() -> Result<(), reqwest::Error> {
-    // Read the content of the text document
-    if let Ok(read_diff) = read_diff_from_file() {
-        // Here you should implement the logic to get the commit message
-        // For now, I'll just return a static string
-        let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
 
-        let mut headers = HeaderMap::new();
-        headers.insert(CONTENT_TYPE, "application/json".parse().unwrap());
-        headers.insert(
-            AUTHORIZATION,
-            format!("Bearer {}", api_key).parse().unwrap(),
-        );
-
-        let body = json!({
-            "model": "gpt-3.5-turbo-instruct",
-            "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are a helpful GitHub assistant. Generate a commit message based on the following Git diff"
-                    },
-                    {
-                        "role": "user",
-                        "content": read_diff.to_string()
-                    }
-                ]
-        });
-
-        // Assuming you want to send the request here
-        let client = reqwest::Client::new();
-        let res = client
-            .post("https://api.openai.com/v1/chat/completions")
-            .headers(headers)
-            .json(&body)
-            .send()
-            .await?;
-
-        // Handle the response here
-        // For now, just ignore it
-    }
-
-    Ok(())
-}
 
 async fn get_commit_message(diff_content: &str) -> Result<String, reqwest::Error> {
     // Here you should implement the logic to get the commit message
@@ -187,10 +145,7 @@ fn read_diff_from_file() -> io::Result<String> {
     Ok(diff_text)
 }
 
-fn delete_diff_file() -> io::Result<()> {
-    remove_file("git_diff.txt")?;
-    Ok(())
-}
+
 
 // ** this reads the git diff
 
@@ -235,10 +190,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut downloaded = 0;
     let total_size = get_dir_size(&print_current_dir());
-    let mut file = fs::File::open("git_diff.txt").expect("Unable to open file");
-    let mut diff_content = String::new();
-    dotenv().unwrap();
-    set_key(env::var("OPENAI_KEY").unwrap());
+    let mut _file = fs::File::open("git_diff.txt").expect("Unable to open file");
+    let diff_content = String::new();
+    // dotenv().unwrap();
+    // set_key(env::var("OPENAI_KEY").unwrap());
 
     //let current_dir = print_current_dir(); //*** THIS CAN BE USED TO READ THE FILES FOR GOOGLE GEMINI */
     let _file = fs::File::open("git_diff.txt").expect("Unable to open file");
@@ -255,9 +210,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         thread::sleep(Duration::from_millis(12));
     }
 
+    update_commit_push().await;
     pb.finish_with_message("downloaded");
     println!("Git Automation complete, Gracias!");
-    update_commit_push();
     Ok::<(), std::io::Error>(()).expect("Unable to write data");
 
     let (additions, removals) = read_additions_removals(&diff_content);
