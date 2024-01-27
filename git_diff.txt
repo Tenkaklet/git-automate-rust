@@ -1,0 +1,193 @@
+diff --git a/git_diff.txt b/git_diff.txt
+index 4b29e23..65649f7 100644
+--- a/git_diff.txt
++++ b/git_diff.txt
+@@ -1,15 +1,116 @@
++diff --git a/git_diff.txt b/git_diff.txt
++index 4b29e23..30a216f 100644
++--- a/git_diff.txt
+++++ b/git_diff.txt
++@@ -1,15 +1,46 @@
++ diff --git a/src/main.rs b/src/main.rs
++-index 999cdaf..fc50757 100644
+++index fc50757..b21b9da 100644
++ --- a/src/main.rs
++ +++ b/src/main.rs
++-@@ -1,10 +1,7 @@
++--use dotenv::dotenv;
++--use openai::set_key;
++- use reqwest::header::CONTENT_TYPE;
++- use reqwest::header::{HeaderMap, AUTHORIZATION};
++- use reqwest::{self};
++- use std::cmp::min;
++--use std::env;
++- use std::fs;
++- use std::fs::File;
++- use std::fs::read_to_string;
+++@@ -82,6 +82,20 @@ async fn get_commit_message(diff_content: &str) -> Result<String, reqwest::Error
+++     Ok(text.to_string())
+++ }
+++ 
++++fn get_git_diff() -> String {
++++    let output = Command::new("git")
++++        .arg("diff")
++++        .output()
++++        .expect("failed to execute git diff");
++++
++++    if !output.status.success() {
++++        println!("git diff command failed");
++++        return String::new();
++++    }
++++
++++    String::from_utf8(output.stdout).expect("Not UTF8")
++++}
++++
+++ async fn update_commit_push() {
+++     let add_command = Command::new("git")
+++         .arg("add")
+++@@ -95,10 +109,11 @@ async fn update_commit_push() {
+++     }
+++ 
+++     let commit = get_commit_message("diff").await;
++++    println!("Commit message: {:?}", commit.unwrap());
+++     let commit_command = Command::new("git")
+++         .arg("commit")
+++         .arg("-m")
+++-        .arg(commit.expect("Commit msg should exist")) // Convert commit_message to String
++++        .arg(get_git_diff()) // Convert commit_message to String
+++         .output()
+++         .expect("failed to execute git commit command");
+++ 
+++@@ -177,6 +192,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+++         // Read the content of the text document
+++         if let Ok(read_diff) = read_diff_from_file() {
+++             println!("Git Diff Content:\n{}", read_diff);
++++            get_commit_message(&read_diff).await.unwrap();
+++         } else {
+++             eprintln!("Error reading diff from file");
+++             exit(1);
+ diff --git a/src/main.rs b/src/main.rs
+-index 999cdaf..fc50757 100644
++index fc50757..587451d 100644
+ --- a/src/main.rs
+ +++ b/src/main.rs
+-@@ -1,10 +1,7 @@
+--use dotenv::dotenv;
+--use openai::set_key;
+- use reqwest::header::CONTENT_TYPE;
+- use reqwest::header::{HeaderMap, AUTHORIZATION};
+- use reqwest::{self};
+- use std::cmp::min;
+--use std::env;
+- use std::fs;
+- use std::fs::File;
+- use std::fs::read_to_string;
++@@ -76,12 +76,26 @@ async fn get_commit_message(diff_content: &str) -> Result<String, reqwest::Error
++         .await?;
++ 
++     let json: serde_json::Value = res.json().await?;
++-
+++    println!("{:?}", json);
++     let text = json["choices"][0]["message"]["content"].as_str().unwrap();
++ 
++     Ok(text.to_string())
++ }
++ 
+++fn get_git_diff() -> String {
+++    let output = Command::new("git")
+++        .arg("diff")
+++        .output()
+++        .expect("failed to execute git diff");
+++
+++    if !output.status.success() {
+++        println!("git diff command failed");
+++        return String::new();
+++    }
+++
+++    String::from_utf8(output.stdout).expect("Not UTF8")
+++}
+++
++ async fn update_commit_push() {
++     let add_command = Command::new("git")
++         .arg("add")
++@@ -95,10 +109,11 @@ async fn update_commit_push() {
++     }
++ 
++     let commit = get_commit_message("diff").await;
+++    println!("Commit message: {:?}", commit.unwrap());
++     let commit_command = Command::new("git")
++         .arg("commit")
++         .arg("-m")
++-        .arg(commit.expect("Commit msg should exist")) // Convert commit_message to String
+++        .arg(get_git_diff()) // Convert commit_message to String
++         .output()
++         .expect("failed to execute git commit command");
++ 
++@@ -177,6 +192,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
++         // Read the content of the text document
++         if let Ok(read_diff) = read_diff_from_file() {
++             println!("Git Diff Content:\n{}", read_diff);
+++            get_commit_message(&read_diff).await.unwrap();
++         } else {
++             eprintln!("Error reading diff from file");
++             exit(1);
+diff --git a/src/main.rs b/src/main.rs
+index fc50757..68732f5 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -70,18 +70,32 @@ async fn get_commit_message(diff_content: &str) -> Result<String, reqwest::Error
+     });
+ 
+     let res = client
+-        .post("https://api.openai.com/v1/chat/completions")
++        .post("https://api.openai.com/v1/completions")
+         .json(&body)
+         .send()
+         .await?;
+ 
+     let json: serde_json::Value = res.json().await?;
+-
++    println!("{:?}", json);
+     let text = json["choices"][0]["message"]["content"].as_str().unwrap();
+ 
+     Ok(text.to_string())
+ }
+ 
++fn get_git_diff() -> String {
++    let output = Command::new("git")
++        .arg("diff")
++        .output()
++        .expect("failed to execute git diff");
++
++    if !output.status.success() {
++        println!("git diff command failed");
++        return String::new();
++    }
++
++    String::from_utf8(output.stdout).expect("Not UTF8")
++}
++
+ async fn update_commit_push() {
+     let add_command = Command::new("git")
+         .arg("add")
+@@ -95,10 +109,11 @@ async fn update_commit_push() {
+     }
+ 
+     let commit = get_commit_message("diff").await;
++    println!("Commit message: {:?}", commit.unwrap());
+     let commit_command = Command::new("git")
+         .arg("commit")
+         .arg("-m")
+-        .arg(commit.expect("Commit msg should exist")) // Convert commit_message to String
++        .arg(get_git_diff()) // Convert commit_message to String
+         .output()
+         .expect("failed to execute git commit command");
+ 
+@@ -177,6 +192,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
+         // Read the content of the text document
+         if let Ok(read_diff) = read_diff_from_file() {
+             println!("Git Diff Content:\n{}", read_diff);
++            get_commit_message(&read_diff).await.unwrap();
+         } else {
+             eprintln!("Error reading diff from file");
+             exit(1);
